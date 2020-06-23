@@ -1,0 +1,1018 @@
+---
+title: "RENEW Data Report"
+author: "Magali Blanco"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '3'
+editor_options: 
+  chunk_output_type: console
+---
+
+
+**To do:**   
+### --> double check Q numbers     
+### --> add "prefer not to answer to all Qs?
+ 
+# Summary of script  
+
+This report summarizes the data collected for the RENEW Study from homecare aide peer navigators and homecare aides who called the peer navigator line. Specifically, it summarizes:
+
+* Peer navigators   
+  - Initial questionnaire   
+  - Training evaluation   
+  - Training quizzes    
+
+* Homecare aides   
+  - Pre-program questionnaire 
+
+ 
+\newpage
+
+### --> check that correct HCA blank surveys are dropped (at the end) 
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, cache=T, cache.comments = F, message = F, warning = F, tidy.opts=list(width.cutoff=60), tidy=TRUE, fig.height = 8)  
+
+# Clear workspace of all objects and unload all extra (non-base) packages
+rm(list = ls(all = TRUE))
+if (!is.null(sessionInfo()$otherPkgs)) {
+  res <- suppressWarnings(
+    lapply(paste('package:', names(sessionInfo()$otherPkgs), sep=""),
+      detach, character.only=TRUE, unload=TRUE, force=TRUE))
+}
+
+pacman::p_load(readxl, tidyverse, knitr, kableExtra,
+               qwraps2
+               )
+
+source("Var&Fns.R")
+
+```
+
+```{r}
+# set common variables
+
+#n_digits <- 0
+show_denom <- "never"
+
+# for correct formating
+options(qwraps2_markup = "markdown", 
+        qwraps2_frmt_digits = 0)
+
+```
+
+```{r}
+######################################### Load data #########################################
+
+pn_dem <- read_excel(file.path("Data", "Peer Navigators", "peer navigator initial questionnaires.xlsx"))
+pn_train_eval <- read_excel(file.path("Data", "Peer Navigators", "peer navigator training evaluations.xlsx"))
+pn_quiz <- read_excel(file.path("Data", "Peer Navigators", "peer navigator training quizzes.xlsx"))
+
+hca0 <- read_excel(file.path("Data", "HCA", "Pre-Program Questionnaire, 4-20.xlsx")) %>%
+  slice(-c(1:2)) %>%
+  ### --> fix Q2.6 (if using) to date if it's a string
+  mutate(
+    
+      )
+
+
+
+#Peer navigators
+pn_quiz <- pn_quiz %>%
+  mutate(
+    #recode supervisor
+    id = recode(id, Supervisor = "999")) %>%
+  #convert character columns to numbers 
+  mutate_if(is.character, as.numeric) %>%
+  # drop individuals who only completed 1 survey
+  filter(!id %in% c(2, 3))
+
+
+# HCA
+hca <- hca0 %>%
+  # drop blank surveys. Using this question as an example. 
+  
+  # ---> DOUBLE CHECK at end. 
+  
+  drop_na(Q2.49_1) %>%
+   mutate(
+    Q2.2_num = Q2.2,
+    Q2.2 = recode_factor(factor(Q2.2),
+                         "1" = "Injury at work",
+                         "2" = "Injury not at work",
+                         "3" = "Pain while working",
+                         "4" = "Pain outside of work",
+                         "5" = "Preventing injury/safety concern",
+                         "6" = "Prefer not to answer"
+                         )
+    ) %>%
+  #make these responses numeric
+  mutate_at(vars(Q2.52_1_TEXT, Q2.43_1_TEXT, Q2.45_1_TEXT, Q2.46,
+                 contains(c("Q2.49", "Q2.50"))
+                 ), ~as.numeric(.)) 
+
+```
+
+
+# Peer Navigators 
+
+```{r}
+######################################### Peer Navigators #########################################
+###################################################################################################
+
+
+### --> ?? no "English as primary langugae" Q. get from benefits group?
+
+```
+
+## Demographics 
+
+From initial Questionnaires 
+
+```{r}
+
+```
+
+
+```{r}
+######################################### Demographics #########################################
+#Table 1 for peer navigators
+pn_dem %>%
+  t1.fn(column.name = "Peer Navigators") %>%
+  filter(substr(x = get("Peer Navigators"), 1,1) != "0") %>%
+  kable(caption = "Participant Demographics & Work Characteristics", 
+        #format = "latex"
+        ) %>%
+  pack_rows("Race", 4, 7,  bold = F, label_row_css = F) %>%
+  pack_rows("Education", 9, 11, label_row_css = F,  bold = F) %>%
+  #work around since bold=F doesn't work in pack_rows()  
+  gsub(pattern = "(<strong>)|<strong/>", replacement = "")
+ 
+```
+
+## Chronic Pain (n, %)
+
+```{r}
+######################################### Chronic Pain #########################################
+
+pn_pain_known = sum(!is.na(pn_dem$chronic_pain))
+pn_pain_yes_n = sum(pn_dem$chronic_pain == 1, na.rm = T)
+pn_pain_yes_pct = paste0(mean(pn_dem$chronic_pain, na.rm = T)*100)
+
+pn_pain_n_pct <- paste0(pn_pain_yes_n, " (", pn_pain_yes_pct, "%)") 
+
+pn_pain_n_pct %>%
+  kable(col.names = "Peer Navigators", 
+        caption = "History of chronic musculoskeletal pain")
+
+```
+
+## Training evaluations
+
+Excludes:   
+
+* open ended responses    
+
+```{r}
+######################################### Training Evaluations #########################################
+# w/o supervisor
+pn_train_eval %>%
+  #drop supervisor & 2 PNs that didn't complete survey 
+  filter(id != "supervisor") %>%
+  training.eval.fn() %>%
+  kable(caption = "Peer Navigators Training and Program Feedback. Number (%) of individuals who 'Agree' or 'Strongly Agree'. Excludes supervisor.",  
+        col.names = c("Measure", "1", "2"),  
+        ) %>%
+  add_header_above(c(" " = 1, "Training" = 2))  
+ #cat(., file = "df.html") 
+
+```
+
+```{r}
+# w/ supervisor
+pn_train_eval %>%
+  #drop supervisor & 2 PNs that didn't complete survey 
+  training.eval.fn() %>%
+  kable(caption = "Peer Navigators Training and Program Feedback. Number (%) of individuals who 'Agree' or 'Strongly Agree'. Includes supervisor.",  
+        col.names = c("Measure", "1", "2"),  
+        ) %>%
+  add_header_above(c(" " = 1, "Training" = 2))  
+  
+```
+
+## Quizzes
+
+```{r}
+######################################### Quizzes #########################################
+
+max_score <- 16
+
+pn_quiz <- pn_quiz %>%
+  #drop supervisor
+  filter(id != 999) %>%
+  #label correct answers based on whether individuals received full credit
+  mutate(
+    wc_benefits_cor = as.numeric(wc_benefits == 5),
+    wc_medical_coverage_cor = as.numeric(wc_medical_coverage == 1),
+    on_job_injuries_cor = as.numeric(on_job_injuries == 4),
+    smoking_cor = as.numeric(smoking == 1),
+    wc_provider_cor = as.numeric(wc_provider==1),
+    second_opinion_cor = as.numeric(second_opinion == 4)) 
+
+quiz_scores <- pn_quiz %>%
+  select(id, training, total_score:second_opinion_cor) %>%
+  group_by(training) %>%
+  summarize(
+    tot_score = round(mean(total_score/max_score)*100),
+    wc_benefits = round(mean(wc_benefits_cor)*100),
+    wc_medical_coverage = round(mean(wc_medical_coverage_cor)*100),
+    on_job_injuries = round(mean(on_job_injuries_cor)*100),
+    smoking = round(mean(smoking_cor)*100),
+    wc_provider = round(mean(wc_provider_cor)*100),
+    second_opinion = round(mean(second_opinion_cor)*100)) 
+
+quiz_scores <- t(quiz_scores) %>%
+  #paste0(., "%")
+    as.data.frame() %>%
+    rownames_to_column()
+
+names(quiz_scores) <- c("Allias", "Pre", "Post1", "Post2")
+
+quiz_scores <- quiz_scores %>%
+  slice(-1) %>%
+  mutate(
+    Question = c("Mean total quiz score",
+              "What kind of benefits does WC cover? (multiple choice)",
+              "A caregiver will only get medical coverage through WC if their injury requires them to take time off of work",
+              "Which are on-the-job injuries? (multiple choice)",
+              "Stopping smoking can help caregivers recover after they are injured on the job",
+              "The attending provider is the only provider covered under the WC claim",
+              "Reasons for wanting to get a second opinion (multiple choice)"
+              ),
+    Pre = paste0(Pre, "%"),
+    Post1 = paste0(Post1, "%"),
+    Post2 = paste0(Post2, "%"),
+    )
+
+quiz_scores %>%
+  select(Allias, Question, Pre:Post2) %>%
+  kable(caption = paste0("Quiz scores before (Pre) and after (Post 1, Post 2) each training module. Percent of individuals who answered correctly. N = ", length(unique(pn_quiz$id)), ".")) %>%
+  add_header_above(c(" " = 2, "Training" = 3))
+
+```
+
+```{r, eval=T}
+
+quiz_scores.l <- quiz_scores %>%
+  gather("Training", "Correct", Pre:Post2) %>%
+  mutate(
+    Training = factor(Training, levels = c("Pre", "Post1", "Post2")),
+    Correct = as.numeric(substr(Correct, 1,  nchar(Correct)-1))/100,
+    Allias = relevel(as.factor(Allias), ref = "tot_score")
+         ) 
+
+quiz_scores.l %>%
+  ggplot(aes(x=Allias, y=Correct, fill=Training)) + 
+  geom_bar(position = "dodge", stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 30, hjust = 1)) + 
+  scale_y_continuous(labels = scales::percent) #+ 
+  #labs(title = "Quiz scores before (Pre) and after (Post 1, Post 2) each training module.\nPercent of individuals who answered correctly.")
+
+```
+
+T-test comparing Pre-training vs Training 2 total quiz scores
+
+```{r}
+
+#reorganize total training scores
+quiz_tot_scores <- pn_quiz %>%
+  select(id, training, total_score) %>%
+  spread(training, total_score, sep = "_")
+
+(quiz_t_test <- t.test(x=quiz_tot_scores$training_0, 
+       y= quiz_tot_scores$training_2))
+
+
+quiz_t_p <- ifelse(round(quiz_t_test$p.value, 3) > 0.001, 
+       round(quiz_t_test$p.value, 3), 
+       "< 0.001")
+
+#paste0("t-test p-val comparing pre-training to training 2 total quiz scores: ", quiz_t_p)
+
+```
+
+Wilcoxon Signed-Rank test. A non-parametric (paired) test of whether two distributions are identical without assuming them to be normally distributed. 
+
+```{r}
+(quiz_wilcox_test <- wilcox.test(x=quiz_tot_scores$training_0, 
+       y= quiz_tot_scores$training_2, 
+       paired = TRUE, 
+       alternative = "two.sided")
+)
+
+quiz_wilcox_p <- ifelse(round(quiz_wilcox_test$p.value, 3) > 0.001, 
+       round(quiz_wilcox_test$p.value, 3), 
+       "< 0.001")
+
+
+```
+
+## Training & Program Feedback
+
+```{r}
+
+```
+
+
+
+
+\newpage
+
+# HCA Surveys
+
+## Demographics
+
+```{r}
+############################### HCA Surveys ##################################################
+##############################################################################################
+
+######################################### Demographics #########################################
+ 
+#Table 1  
+hca %>%
+    dplyr::summarize(
+      N = n(),
+      
+      #age
+      # [MISSING]
+      # "Age (mean, SD)" = mean_sd()
+      
+      #gender
+      "Female" = n_perc(Q2.55==1, na_rm = T),
+      "Male" = n_perc(Q2.55==2, na_rm = T),
+      "Gender Unknown" = n_perc(Q2.55==7, na_rm = T),
+      
+      #race
+      ### --> why are surveys all single options? Nobody selected multiple races??
+      "American Indian or Alaska Native" = n_perc(Q2.57 == 1, na_rm = T),
+      "Asian" = n_perc(Q2.57 == 2, na_rm = T),
+      "Black or African American" = n_perc(Q2.57 == 3, na_rm = T),
+      "Native Hawaiian or Other Pacific Islander" = n_perc(Q2.57 == 4, na_rm = T),
+      "White"= n_perc(Q2.57 == 5, na_rm = T),
+      "Other Race" = n_perc(Q2.57 == 6, na_rm = T),
+      "Race Unknown" = n_perc(Q2.57 == 7, na_rm = T),
+      
+      #hispanic
+      "Yes" = n_perc(Q2.56 ==1, na_rm = T),
+      "No" = n_perc(Q2.56 ==2, na_rm = T),
+      "Origin Unknown" = n_perc(Q2.56 ==3, na_rm = T),
+      
+      #education
+      # [MISSING]
+      # "Less than high school" =  n_perc(___, na_rm = T),
+      # "High school or GED" =   n_perc(___, na_rm = T),
+      # "Some college" =   n_perc(___, na_rm = T),
+      # "Finished college" =   n_perc(___, na_rm = T),
+      # "Trade/vocational school" =   n_perc(___, na_rm = T),
+      # "Other education" =   n_perc(___, na_rm = T),
+      # "Education Unknown" =   n_perc(___, na_rm = T),
+      
+      #English 
+      # [MISSING]
+      # "English as a primary language" = n_perc(___, na_rm = T)
+      ) %>%
+  t() %>% 
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+  # drop rows w/ 0 entries
+  filter(substr(V1, 1,1) != 0) %>%
+  kable(caption = "Home Care Aide Demographics", 
+        col.names = c("", "N (%)")
+        ) %>%
+  pack_rows("Gender", 2, 4,  bold = F, label_row_css = T) %>%
+  pack_rows("Race", 5, 9,  bold = F, label_row_css = F) %>%
+  pack_rows("Hispanic", 10, 12,  bold = F, label_row_css = F) %>%
+  # #work around since bold=F doesn't work in pack_rows()
+   gsub(pattern = "(<strong>)|<strong/>", replacement = "") %>%
+  kable_styling()
+  
+
+```
+
+## Employment
+
+```{r}
+######################################### Employment #########################################
+
+hca %>%
+    dplyr::summarize(
+      N = n(),
+      "Currently working as a HCA (n, %)" = n_perc(Q2.31==1, na_rm = T, show_denom = "never"),
+      "Number of current clients (median)" = median(as.numeric(Q2.52_1_TEXT), na.rm = T),
+      "Caregiver in own home (n, %)" = n_perc(Q2.53==1, na_rm = T)
+      ) %>%
+  t() %>% 
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+  # drop rows w/ 0 entries
+  filter(substr(V1, 1,1) != 0) %>%
+  kable(caption = "Home Care Aide Employment", 
+        col.names = c("", "")
+        ) %>%
+  kable_styling()
+
+```
+
+## Reason for calling
+
+note: The individual who responded "injury not at work" as the reason for her/his call answered the pain questions and is taking pain medication. She/he also filed an accepted worker's comp claim. Do we want to move this person to the "pain while working" category? 
+
+### --> could look at call logs to verify reasons for calling? 
+
+```{r}
+hca %>%
+  group_by("Reason for Calling" = Q2.2) %>%
+  dplyr::summarize(
+    N = n(),
+    #N = paste0(n(), "/", nrow(.) ),
+    Percent = paste0(round(N/nrow(.)*100), "%" ),
+    Description = paste(Q2.3, collapse = "; "),
+    #Description2 = writeLines(Q2.3)  #cat(paste(Q2.3), sep="\n") #cat(Q2.3, sep = "\n")
+    #Description = linebreak(paste0(Q2.3, collapse ="\n" )   ) ,
+    
+  ) %>%
+  kable(caption = paste0("Reason for calling the peer navigator line (n = ", nrow(hca), ")")) %>%
+  kable_styling()
+
+```
+
+### --> ? 
+
+```{r, results="asis"}
+# ??? create a bulleted list
+
+#cat(paste0("- `", names(iris), "`"), sep = "\n")
+
+```
+
+
+
+## Injury 
+
+Note, only those who reported calling about injury responded to these questions, according to the survey logic.
+
+
+```{r}
+######################################### Injury #########################################
+
+#tb <- 
+  hca %>%
+  filter(Q2.2_num %in% c(1:2)) %>%
+  group_by(Q2.2) %>%
+  dplyr::summarize(
+    N = n(),
+    #"Injury (n, %)" = paste0(n(), "/", nrow(hca), " (", round(n()/nrow(hca)*100), "%)" ),
+   
+   "Where did the injury occur?" = "",
+    "Head" = n_perc(grepl("1", Q2.8[!is.na(Q2.8)]), show_denom = show_denom),  
+   "Neck or throat" = n_perc(grepl("2", Q2.8[!is.na(Q2.8)]), show_denom = show_denom),
+   "Back/trunk/torso" = n_perc(grepl("3", Q2.8[!is.na(Q2.8) ]), show_denom = show_denom),
+   "Upper Extremities (shoulder, arm, hand)" = n_perc(grepl("4", Q2.8[!is.na(Q2.8) ]), show_denom = show_denom),
+   "Lower extremities (hip, leg, foot)" = n_perc(grepl("5", Q2.8[!is.na(Q2.8) ]), show_denom = show_denom),
+   "Other location" = n_perc(grepl("6", Q2.8[!is.na(Q2.8) ]), show_denom = show_denom),
+   
+   "How did the injury occur?" = "",
+   "Overexertion or bodily reaction" = n_perc(Q2.7==1, show_denom = show_denom),
+   "Slip, trip or fall" = n_perc(Q2.7==2, na_rm = T, show_denom = show_denom),
+   "Exposure to harmful substance or environment" = n_perc(Q2.7==3, na_rm = T, show_denom = show_denom),
+   "Transportation accident" = n_perc(Q2.7==4, na_rm = T, show_denom = show_denom),
+   "Violent or physical contact by persons" = n_perc(Q2.7==5, na_rm = T, show_denom = show_denom),
+   "Violent or physical contact by animals" = n_perc(Q2.7==6, na_rm = T, show_denom = show_denom),
+   "Contact with moving or falling objects or equipment" = n_perc(Q2.7==7, na_rm = T, show_denom = show_denom),
+   "Fire or explosion" = n_perc(Q2.7==8, na_rm = T, show_denom = show_denom),
+   "Other" = n_perc(Q2.7==9, na_rm = T, show_denom = show_denom),
+   )  %>%
+  t() %>% 
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+  # rename columns that begin with "V" 
+  row1_to_names() %>%
+  kable(caption = "HCA Injury (N, %)") %>%
+    add_indent(c(3:8, 10:18)) %>%
+  kable_styling()
+
+ 
+   
+
+```
+
+
+
+## Pain 
+
+Note, only those who reported calling about injury responded to these questions, according to the survey logic.
+
+```{r}
+######################################### Pain #########################################
+
+hca %>%
+  filter(Q2.2_num %in% c(3:4)) %>%
+  group_by(Q2.2) %>%
+  dplyr::summarize(
+   
+   #Pain at work
+    N = n(),
+    #"Pain (n, %)" = paste0(n(), "/", nrow(hca), " (", round(n()/nrow(hca)*100), "%)" ),
+   
+   "Type of pain" = "",
+   "Joint" = n_perc(grepl("1", Q2.19[!is.na(Q2.19)]), show_denom = show_denom),
+   "Muscle" = n_perc(grepl("2", Q2.19[!is.na(Q2.19) ]), show_denom = show_denom),
+   "Nerve" = n_perc(grepl("3", Q2.19[!is.na(Q2.19) ]), show_denom = show_denom),
+   "Other" = n_perc(grepl("4", Q2.19[!is.na(Q2.19) ]), show_denom = show_denom),
+   
+   "Pain duration" = "",
+   "Days" = n_perc(Q2.22==1, na_rm = T, show_denom = show_denom),
+   "Weeks" = n_perc(Q2.22==2, na_rm = T, show_denom = show_denom),
+   "Months" = n_perc(Q2.22==3, na_rm = T, show_denom = show_denom),
+   "Years" = n_perc(Q2.22==4, na_rm = T, show_denom = show_denom),
+   
+   "Pain Location" = "",
+   "Head" = n_perc(grepl("1", Q2.21[!is.na(Q2.21)]), show_denom = show_denom),
+   "Neck or throat" = n_perc(grepl("2", Q2.21[!is.na(Q2.21)]), show_denom = show_denom),
+   "Back/trunk/torso" = n_perc(grepl("3", Q2.21[!is.na(Q2.21)]), show_denom = show_denom),
+   "Upper Extremities (shoulder, arm, hand)" = n_perc(grepl("4", Q2.21[!is.na(Q2.21)]), show_denom = show_denom),
+   "Lower extremities (hip, leg, foot)" = n_perc(grepl("5", Q2.21[!is.na(Q2.21) ]), show_denom = show_denom),
+   "Other" = n_perc(grepl("6", Q2.21[!is.na(Q2.21)]), show_denom = show_denom),
+
+   "Known medical condition as etiology of pain" = n_perc(Q2.20==1, na_rm = T, show_denom = show_denom)
+  ) %>%
+  t() %>% 
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+  # # drop rows w/ 0 entries
+  #                                 # no V2 column
+  # filter(!(substr(V1, 1,1) == 0 #& substr(V2, 1,1) == 0
+  #          )) %>%
+   # rename columns that begin with "V" 
+  row1_to_names() %>%
+  kable(caption = "HCA Pain") %>%
+    add_indent(c(3:6, 8:11, 13:17)) %>%
+  kable_styling()
+    
+```
+
+
+## Interventions for Injury and Chronic Musculoskeletal Pain
+
+Work-related injury or pain (n = `r sum(grepl("1|3", hca$Q2.2_num))`): Modified duty
+
+If denominators seem off, it's likely due to individuals choosing not to respond to some questions.
+
+```{r}
+######################################### Interventions #########################################
+
+hca %>%
+    filter(Q2.2_num %in% c(1,3)) %>%
+  mutate(
+    Q2.2 = recode_factor(factor(Q2.2),
+                         "1" = "Injury at work",
+                         "3" = "Pain while working",
+                         )
+    ) %>%
+  group_by(Q2.2) %>% 
+  dplyr::summarize(
+   
+   "Performing modified duty" = n_perc(Q2.33 == 1, na_rm = T, show_denom = "always"),
+   "Q2.33 - prefer not to answer" = n_perc(Q2.33 == 3, na_rm = T, show_denom = "always"),
+   
+   "If performing modified duty, nature of modified duty" = "",
+   "Not working at all" = n_perc(Q2.34 == 6, na_rm = T, show_denom = "always"),
+   "Working few hours" = n_perc(Q2.34 == 1, na_rm = T, show_denom = "always"),
+   "Not doing certain tasks" = n_perc(Q2.34 == 2, na_rm = T, show_denom = "always"),
+   "Using tools or equipment to do certain tasks" = n_perc(Q2.34 == 3, na_rm = T, show_denom = "always"),
+   "Other modification" = n_perc(Q2.34 == 4, na_rm = T, show_denom = "always"),
+   
+   "Provider category for recommended modified duty" = "",
+   "The attending provider for my workers’ compensation claim prescribed the restrictions" = n_perc(Q2.35 == 1, na_rm = T, show_denom = "always"),
+   "Another health care provider recommended the restrictions" = n_perc(Q2.35 == 2, na_rm = T, show_denom = "always"),
+    "My client’s case manager recommended the restrictions" = n_perc(Q2.35 == 3, na_rm = T, show_denom = "always"),
+     "I restricted my work/made accommodations on my own" = n_perc(Q2.35 == 4, na_rm = T, show_denom = "always"),
+   "Other modification approach strategy" = n_perc(Q2.35 == 5, na_rm = T, show_denom = "always"),
+   "Prefer not to answer"= n_perc(Q2.35 == 6, na_rm = T, show_denom = "always")
+   ) %>%
+  t() %>% 
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+   # rename columns that begin with "V" 
+  row1_to_names() %>%
+  kable(caption = "Work-related injury or pain: Modified duty",  
+        #row.names = T
+        ) %>% 
+  add_indent(c(2, 4:8, 10:15)) %>%
+  kable_styling()
+
+```
+
+Injury or pain (n = `r sum(grepl("1|2|3|4", hca$Q2.2_num))`): Medical care, medication & other resources used
+
+```{r}
+hca %>%
+    filter(Q2.2_num %in% c(1:4)) %>%
+  mutate(
+    Q2.40_1_TEXT = recode_factor(factor(Q2.40_1_TEXT),
+                                 "PT, physical therapy and massage therapy" = "PT, massage",
+                                 "Tryed physical therapy" = "PT",
+                                 "Massage and fusions and cyphoplasties" = "Massage, Kyphoplasty"
+                                 )
+    ) %>%
+  group_by(Q2.2) %>% 
+  dplyr::summarize(
+    N = n(),
+   "Type of medical care sought (select all that apply)" = "",
+            #multiple options selected
+   "None" = n_perc(grepl("1", Q2.36[!is.na(Q2.36)]), show_denom = show_denom),  
+   "First aid" = n_perc(grepl("2", Q2.36[!is.na(Q2.36)]), show_denom = show_denom),
+   "Treatment in a clinic by an occupational health provider" = n_perc(grepl("3", Q2.36[!is.na(Q2.36)]), show_denom = show_denom),  
+   "Rehabilitative therapies (such as massage, physical therapy, occupational therapy, chiropractic care, acupuncture, etc.)."= n_perc(grepl("4", Q2.36[!is.na(Q2.36)]), show_denom = show_denom),
+   "Treatment at an emergency room" = n_perc(grepl("5", Q2.36[!is.na(Q2.36)]), show_denom = show_denom),
+   "Other care" = n_perc(grepl("6", Q2.36[!is.na(Q2.36)]), show_denom = show_denom),
+   "Other care - details" = paste0(unique(Q2.36_6_TEXT[!is.na(Q2.36_6_TEXT)]), collapse = "; "),
+   
+   "Taking pain medication" = n_perc(Q2.37 == 1, na_rm = T, show_denom = show_denom),
+   "If taking pain medicdation, what kind (select all that apply)" = "",
+  
+        # multiple options
+   "Non-prescription medications (Over-the-counter medications)" = n_perc(grepl("1", Q2.38[!is.na(Q2.38)]), show_denom = show_denom),  
+        "Prescription medications" = n_perc(grepl("2", Q2.38[!is.na(Q2.38)]), show_denom = show_denom),  
+   "Other medication" = n_perc(grepl("3", Q2.38[!is.na(Q2.38)]), show_denom = show_denom),  
+   
+   "Used other resources to help with injury or pain" = n_perc(Q2.40 == 1, na_rm = T, show_denom = show_denom),
+   
+   "Other resources used" = paste0(unique(Q2.40_1_TEXT[!is.na(Q2.40_1_TEXT)]), collapse = "; "),
+   
+   # this Q is similar to the Q later (Q2.29) about availability specifically after injury/pain? 
+   "General availability of respite care" = "",
+   "Never/rarely" = n_perc(Q2.54 == 1, na_rm = T, show_denom = show_denom),
+   "Sometimes" = n_perc(Q2.54 == 2, na_rm = T, show_denom = show_denom),
+   "Usually/always" = n_perc(Q2.54 == 3, na_rm = T, show_denom = show_denom),
+   "Q2.54 - Prefer not to answer" = n_perc(Q2.54 == 4, na_rm = T, show_denom = show_denom),
+   
+   ) %>%
+  t() %>% 
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+   # rename columns that begin with "V" 
+  row1_to_names() %>%
+  kable(caption = "Injury or pain: Medical care, medication & other resources used", 
+        #row.names = T
+        )  %>%
+  add_indent(c(3:9, 11:14, 16, 18:21)) %>%
+  kable_styling()
+   
+```
+
+Injury (n = `r sum(grepl("1|2", hca$Q2.2_num))`): Worker's Compensation
+
+```{r}
+hca %>%
+  # only these respondants answered these questions
+  filter(Q2.2_num %in% c(1:2)) %>%
+  mutate(Q2.2 = recode_factor(factor(Q2.2),
+                              "1" = "Injury at work",
+                              "2" = "Injury not at work"
+                              )) %>%
+  group_by(Q2.2) %>% 
+  dplyr::summarize(
+    "Had filed or working on a claim" = n_perc(Q2.9 %in% c(1, 2), na_rm = T, show_denom = "always"),
+    "Had filed a claim prior to the initial peer navigator call" = n_perc(Q2.9==1, na_rm = T, show_denom = "always"),
+    "Still working on paperwork but have not filed yet" = n_perc(Q2.9==2, na_rm = T, show_denom = "always"),
+    
+    # Q2.9 - Prefer not to answer 
+    
+        "Received help filing paperwork" = n_perc(Q2.11==1, na_rm = T, show_denom = "always"),
+    #"Received help filing paperwork from a peer navigator" = n_perc(Q2.12==1, na_rm = T, show_denom = "always"),
+    "Needed to find a new health care provider to open or manage claim" = n_perc(Q2.15==1, na_rm = T, show_denom = "always"),
+ "Mostly or completely satisfied with the process of finding a new provider" = n_perc(Q2.16[!is.na(Q2.16)] %in% c(3,4), na_rm = T, show_denom = "always"),
+ 
+ # this question was accidentally asked to everyone. only show the responses of those who said they had filed or were working on filing a claim: Q2.9 %in% c(1, 2)
+ "Is comfortable interacting with his/her claim manager at Labor and Industries about his/her workers’ compensation claim (agree or stronly agree)" = n_perc(Q2.50_6[Q2.9 %in% c(1, 2)] %in% c(4:5), na_rm = T, show_denom = "always", digits = 0), 
+ 
+ 
+ "Claim status" = "", 
+ "Still filing paperwork" = n_perc(Q2.13==1, na_rm = T, show_denom = "always"),
+ "Awaiting initial decision" = n_perc(Q2.13==2, na_rm = T, show_denom = "always"),
+ "Accepted, claim is currently open" = n_perc(Q2.13==3, na_rm = T, show_denom = "always"),
+ "Accepted, claim is currently closed" = n_perc(Q2.13==4, na_rm = T, show_denom = "always"),
+ "Denied, appealing decision" = n_perc(Q2.13==5, na_rm = T, show_denom = "always"),
+ "Denied, not appealing decision" = n_perc(Q2.13==6, na_rm = T, show_denom = "always"),
+ 
+ "Mostly or completely satisfied with the claim filing process" = n_perc(Q2.14[!is.na(Q2.13)] %in% c(3,4), na_rm = T, show_denom = "always"),
+ 
+ "Reason if a claim was not filed"= "",
+ "Not eligible" = n_perc(Q2.10 == 1, na_rm = T, show_denom = "always"),
+ "Didn't feel it was necessary" = n_perc(Q2.10 == 2, na_rm = T, show_denom = "always"),
+ "Didn't have time" = n_perc(Q2.10 == 3, na_rm = T, show_denom = "always"),
+ "Didn't know how" = n_perc(Q2.10 == 4, na_rm = T, show_denom = "always"),
+ "Didn't want to go to the doctor/clinic" = n_perc(Q2.10 == 5, na_rm = T, show_denom = "always"),
+ "Didn't want to file paperwork with L&I" = n_perc(Q2.10 == 6, na_rm = T, show_denom = "always"),
+ "Other reason" = n_perc(Q2.10 == 7, na_rm = T, show_denom = "always"),
+  ) %>%
+  t() %>% 
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+   # rename columns that begin with "V" 
+  row1_to_names() %>%
+  kable(caption = "Injury: Worker's Compensation", 
+        #row.names = T
+        ) %>% 
+  add_indent(c(2:3, 6, 9:14, 17:23)) %>%
+  kable_styling()
+
+```
+
+
+Injury or pain (n = `r sum(grepl("1|2|3|4", hca$Q2.2_num))`): Impact
+
+```{r}
+hca %>%
+    filter(Q2.2_num %in% c(1:4)) %>%
+  group_by(Q2.2) %>% 
+  dplyr::summarize(
+   "Working with pain or injury" = n_perc(Q2.25 == 1, na_rm = T, show_denom = "always"),
+   "Missed work because of pain or injury" = n_perc(Q2.26 == 1, na_rm = T, show_denom = "always"),
+   "Days missed (n; mean, SD)" = mean_sd(as.numeric(Q2.27_1_TEXT), na_rm = T, denote_sd = "paren", show_n = "always", 
+                                      ),
+   
+   "Received time loss" = "",
+    "Yes, wage replacement/time loss from my workers’ compensation claim/Labor & Industries" = n_perc(Q2.28==1, na_rm = T, show_denom = "always"),
+   "Yes, paid time off or sick leave through Washington State Department of Social and Health Services" = n_perc(Q2.28==2, na_rm = T, show_denom = "always"),
+   "Yes, other" = n_perc(Q2.28==3, na_rm = T, show_denom = "always"),
+   "No" = n_perc(Q2.28==4, na_rm = T, show_denom = "always"),
+   
+   "Respite coverage available during injury or pain" = "",
+   "All the days off I needed were covered" = n_perc(Q2.29 == 1, na_rm = T, show_denom = "always"),
+   "Some of the days off I needed were covered" = n_perc(Q2.29 == 2, na_rm = T, show_denom = "always"),
+   "None of the days off I needed were covered" = n_perc(Q2.29 == 3, na_rm = T, show_denom = "always"),
+   "Not applicable - I did not need coverage" = n_perc(Q2.29 == 4, na_rm = T, show_denom = "always"),
+   "Q2.29 - Prefer not to answer" = n_perc(Q2.29 == 5, na_rm = T, show_denom = "always"),
+   
+   "Lost clients due to time off after injury or pain" = n_perc(Q2.30 == 1, na_rm = T, show_denom = "always"),
+   
+  ) %>%
+  t() %>% 
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+  row1_to_names() %>%
+  kable(caption = "Injury or pain: Impact", 
+        #row.names = T
+        )  %>%
+  add_indent(c(3, 5:8, 10:14)) %>%
+  kable_styling()
+
+```
+
+ 
+
+## Pre-Post: Work, Pain and Injury
+
+```{r}
+
+hca %>%
+    filter(Q2.2_num %in% c(1:4)) %>%
+  group_by(Q2.2) %>% 
+  dplyr::summarize(
+    N = n(),
+   "Excellent" = n_perc(Q2.41 == 1, na_rm = T, show_denom = show_denom),
+   "Very good" = n_perc(Q2.41 == 2, na_rm = T, show_denom = show_denom),
+   "Good" = n_perc(Q2.41 == 3, na_rm = T, show_denom = show_denom),
+   "Fair" = n_perc(Q2.41 == 4, na_rm = T, show_denom = show_denom),
+   "Poor" = n_perc(Q2.41 == 5, na_rm = T, show_denom = show_denom),
+   "Q2.41 - Prefer not to answer" = n_perc(Q2.41 == 1, na_rm = T, show_denom = show_denom),
+   
+  ) %>%
+  t() %>% 
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+  row1_to_names() %>%
+  kable(caption = "General health status")  %>%
+  kable_styling()
+
+
+```
+
+```{r}
+hca %>%
+    filter(Q2.2_num %in% c(1:4)) %>%
+  mutate(
+    #subtract 1 b/c of coding
+    Q2.48 = as.numeric(Q2.42)-1,
+    ) %>%
+  group_by(Q2.2) %>% 
+  dplyr::summarize(
+    N = n(), 
+      "Pain level over the last 7 days, 0-10 (mean, SD)" = mean_sd(Q2.48, na_rm = T, denote_sd = "paren", show_n = show_denom),  
+ 
+  ) %>%
+  t() %>% 
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+  row1_to_names() %>%
+  kable(caption = "Pain level", 
+        #row.names = T
+        )  %>%
+  #add_indent(c(3, 5:8, 10:14)) %>%
+  kable_styling()
+```
+
+
+```{r, about scoring}
+#http://www.reillyassociates.net/WPAI_Scoring.html  
+#WPAI outcomes are expressed as impairment percentages, with higher numbers indicating greater impairment and less productivity, i.e., worse outcomes, as follows: 
+
+# Questions:
+# 1 = currently employed
+# 2 = hours missed due to health problems
+# 3 = hours missed other reasons
+# 4 = hours actually worked
+# 5 = degree health affected productivity while working
+# 6 = degree health affected regular activities
+# 
+# Scores:
+# Multiply scores by 100 to express in percentages.
+# 
+# Percent overall work impairment due to health:
+#       Q2/(Q2+Q4)+[(1-(Q2/(Q2+Q4)))x(Q5/10)]
+# 
+# Percent activity impairment due to health: 
+#   Q6/10 
+#   Q2.47/10
+
+```
+
+
+```{r}
+hca %>%
+    filter(Q2.2_num %in% c(1:4)) %>%
+  mutate(
+    #subtract 1 b/c of coding
+    Q2.42 = as.numeric(Q2.42)-1,
+    Q2.47 = as.numeric(Q2.47)-1,
+    Q2.48 = as.numeric(Q2.42)-1,
+    ) %>%
+  group_by(Q2.2) %>% 
+  dplyr::summarize(
+    N = n(), 
+   "Current work ability, 0-10 (mean, SD)" = mean_sd(Q2.42, na_rm = T, denote_sd = "paren", show_n = show_denom),
+   
+                                                              #Q6/10 
+   "Percent activity impairment due to health (mean, SD)" = mean_sd(Q2.47/10*100, na_rm = T, denote_sd = "paren", show_n = show_denom), 
+   "Pain level over the last 7 days, 0-10 (mean, SD)" = mean_sd(Q2.48, na_rm = T, denote_sd = "paren", show_n = show_denom),  
+ 
+  ) %>%
+  t() %>% 
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+  row1_to_names() %>%
+  kable(caption = "Impact of health problems on work", 
+        #row.names = T
+        )  %>%
+  #add_indent(c(3, 5:8, 10:14)) %>%
+  kable_styling()
+
+```
+
+
+```{r}
+#hca[c("Q2.2", "Q2.43_1_TEXT", "Q2.45_1_TEXT", "Q2.46")] %>% View()
+
+hca %>%
+  filter(Q2.2_num %in% c(1:4)) %>%
+  mutate(   
+  #subtract 1 b/c of coding
+    Q2.46 = Q2.46-1, #) %>%
+  #select(Q2.2, Q2.2_num, Q2.43_1_TEXT, Q2.45_1_TEXT, Q2.46) %>%
+  # Q2/(Q2+Q4)+[(1-(Q2/(Q2+Q4)))x(Q5/10)]
+  #mutate(
+    value = Q2.43_1_TEXT/(Q2.43_1_TEXT + Q2.45_1_TEXT) + ((1-(Q2.43_1_TEXT/(Q2.43_1_TEXT + Q2.45_1_TEXT)))*(Q2.46/10)),
+         value = value*100
+  ) %>%
+  drop_na(value) %>%
+  group_by(Q2.2) %>%
+  dplyr::summarize(
+    N = n(),
+    "Percent of overall work impairment due to health (mean, SD)" = mean_sd(value, na_rm = T, denote_sd = "paren", digits = 0)
+  ) %>%
+  t() %>% 
+  as.data.frame() %>% rownames_to_column(var = "Measure") %>%
+  row1_to_names() %>%
+  kable(caption = "Impact of health problems on work",
+        )  %>%
+  kable_styling()
+
+
+```
+
+Job demands (Agree or strongly agree)
+
+```{r}
+# hca%>%
+#   select(Q2.2, contains("Q2.49")) %>%
+#   summary()
+
+hca %>%
+  group_by(Q2.2) %>% 
+  dplyr::summarize(
+    N = n(),
+    "On my job, I have very little freedom to decide how I do my work." = n_perc(Q2.49_1 %in% c(4:5), na_rm = T, show_denom = show_denom ),
+    "My job allows me to make a lot of decisions on my own." = n_perc(Q2.49_2 %in% c(4:5), na_rm = T, show_denom = show_denom ),
+    "My job security is good." = n_perc(Q2.49_3 %in% c(4:5), na_rm = T, show_denom = show_denom ),
+    "My job is emotionally demanding." = n_perc(Q2.49_4 %in% c(4:5), na_rm = T, show_denom = show_denom ),
+    "I have enough time to get the job done." = n_perc(Q2.49_5 %in% c(4:5), na_rm = T, show_denom = show_denom ),
+     "My job requires working very hard." = n_perc(Q2.49_6 %in% c(4:5), na_rm = T, show_denom = show_denom ),
+    "My job requires me to do repeated lifting, pushing, pulling, or bending." = n_perc(Q2.49_7 %in% c(4:5), na_rm = T, show_denom = show_denom ),
+    "My job regularly requires me to perform repetitive or forceful hand movements." = n_perc(Q2.49_8 %in% c(4:5), na_rm = T, show_denom = show_denom ),
+    ) %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+  row1_to_names() %>%
+  kable(caption = "Job demands (agree or strongly agree)")  %>%
+  kable_styling()
+
+
+```
+
+Comfort level and access to resources
+
+```{r}
+ 
+hca %>%
+  group_by(Q2.2) %>% 
+  dplyr::summarize(
+    N = n(),
+     "When I have questions about my health and safety related to work, I know who to ask or where to find the answer." = n_perc(Q2.50_1 %in% c(4:5), na_rm = T, show_denom = show_denom ),
+    "I feel comfortable asking for help when I have questions about my health and safety at work." = n_perc(Q2.50_2 %in% c(4:5), na_rm = T, show_denom = show_denom ),
+    "I am comfortable refusing unsafe work." = n_perc(Q2.50_3 %in% c(4:5), na_rm = T, show_denom = show_denom ),
+    "I am comfortable with the idea of filing a workers’ compensation claim (for current or  possible future work-related injury)." = n_perc(Q2.50_4 %in% c(4:5), na_rm = T, show_denom = show_denom ),
+    "I am comfortable interacting with clients’ case managers about my needs for my own health and safety at work." = n_perc(Q2.50_5 %in% c(4:5), na_rm = T, show_denom = show_denom ), 
+    # move this question to the worker's compensation section since this was only supposed to have been asked to people who had filed or were working on filing a claim
+    #"I am comfortable interacting with my claim manager at Labor and Industries about my workers’ compensation claim." = n_perc(Q2.50_6 %in% c(4:5), na_rm = T, show_denom = show_denom ), 
+    "I am comfortable interacting with health care providers about my injury and/or pain." = n_perc(Q2.50_7 %in% c(4:5), na_rm = T, show_denom = show_denom ), 
+    "I am confident I would be able to get the help I need if I had a work-related injury in the future." = n_perc(Q2.50_8 %in% c(4:5), na_rm = T, show_denom = show_denom ), 
+    "I would be comfortable filing a workers’ compensation claim If I had a work-related injury in the future." = n_perc(Q2.50_9 %in% c(4:5), na_rm = T, show_denom = show_denom ), 
+    
+  ) %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "Measure") %>%
+  row1_to_names() %>%
+  kable(caption = "Comfort level and access to resources (agree or strongly agree)")  %>%
+  kable_styling()
+
+```
+
+  
+  
+  
+  
+## Program Feedback
+
+```{r}
+###################################### Program Feedback #####################################
+
+```
+
+
+
+# Call Logs 
+
+```{r}
+######################################### Call Logs #########################################
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\newpage
+# Code
+
+```{r,ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60), include=T}
+```
+
+ 
